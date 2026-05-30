@@ -38,6 +38,16 @@ docker run -p 8000:8000 --env-file .env veritas-ai
 
 ## Run the frontend (local / Streamlit Cloud)
 
+From repo root (works with Streamlit Cloud default `app.py`):
+
+```powershell
+cd "D:\veritas ai"
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Or run the frontend folder directly:
+
 ```powershell
 cd "D:\veritas ai\frontend"
 pip install -r requirements.txt
@@ -48,8 +58,8 @@ streamlit run app.py
 
 | Setting | Value |
 |---------|--------|
-| Main file | `frontend/app.py` |
-| Requirements | `frontend/requirements.txt` |
+| Main file | `app.py` (root) or `frontend/app.py` |
+| Requirements | `requirements.txt` (root includes frontend deps) |
 
 Secrets (optional — no `.env` in the frontend):
 

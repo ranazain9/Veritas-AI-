@@ -206,18 +206,19 @@ try:
     SUPPLIERS, SCENARIOS_RAW = _load_catalogs(base, key)
 except Exception as exc:
     st.error(f"Cannot load catalog from Railway API: {exc}")
-    st.info(f"Backend: `{base}` — check `/health` and `/v1/suppliers`")
+    st.info(f"Check `{api.url(VeritasAPI.HEALTH)}` and `{api.url(VeritasAPI.SUPPLIERS)}`")
     st.stop()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 st.sidebar.markdown("<h2 style='font-family:\"Space Grotesk\";font-size: 22px; color: #6366f1;'>🌐 Railway API</h2>", unsafe_allow_html=True)
-st.sidebar.code(base, language=None)
+health_url = api.url(VeritasAPI.HEALTH)
+st.sidebar.markdown(f"[{health_url}]({health_url})")
 if api_ok:
-    st.sidebar.success(f"✅ GET /health → {api_msg}")
+    st.sidebar.success(f"✅ {health_url} → {api_msg}")
 else:
-    st.sidebar.error(f"❌ GET /health failed: {api_msg}")
+    st.sidebar.error(f"❌ {health_url} failed: {api_msg}")
 
-with st.sidebar.expander("GET /v1/health/config"):
+with st.sidebar.expander(api.url(VeritasAPI.HEALTH_CONFIG)):
     try:
         cfg = api.health_config()
         for row in cfg:
@@ -228,7 +229,7 @@ with st.sidebar.expander("GET /v1/health/config"):
 
 st.sidebar.markdown("---")
 scenario_id = st.sidebar.selectbox(
-    "GET /v1/scenarios",
+    api.url(VeritasAPI.SCENARIOS),
     list(SCENARIOS_RAW.keys()),
     format_func=lambda k: SCENARIOS_RAW[k]["label"],
 )
@@ -237,7 +238,7 @@ if SCENARIOS_RAW[scenario_id].get("description"):
 
 st.sidebar.markdown("---")
 simulate_error = st.sidebar.selectbox(
-    "Chaos injection (POST /v1/audits/run)",
+    f"Chaos injection ({api.url(VeritasAPI.AUDITS_RUN)})",
     [None, "proxy_timeout", "bot_block", "payload_corruption"],
     format_func=lambda x: {
         None: "Nominal (no errors)",
@@ -280,7 +281,7 @@ with tab_live:
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
-        st.markdown("<h3>🌍 GET /v1/suppliers</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>🌍 {api.url(VeritasAPI.SUPPLIERS)}</h3>", unsafe_allow_html=True)
         map_rows = []
         for sid, val in SUPPLIERS.items():
             map_rows.append({
@@ -306,7 +307,7 @@ with tab_live:
         st.plotly_chart(fig, use_container_width=True)
 
     with col_right:
-        st.markdown("<h3>⚡ POST /v1/audits/run</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>⚡ {api.url(VeritasAPI.AUDITS_RUN)}</h3>", unsafe_allow_html=True)
         supplier_key = st.selectbox(
             "Supplier",
             list(SUPPLIERS.keys()),
@@ -323,7 +324,7 @@ with tab_live:
             history = api.supplier_score_history(supplier_key, limit=10)
             if history:
                 hdf = pd.DataFrame(history)
-                st.caption("GET /v1/suppliers/{id}/score-history")
+                st.caption(api.url(f"{VeritasAPI.SUPPLIERS}/{supplier_key}/score-history"))
                 st.line_chart(hdf.set_index("created_at")["truth_score"])
         except Exception:
             pass
@@ -331,7 +332,7 @@ with tab_live:
         audit_clicked = st.button("🚀 Run audit", type="primary", use_container_width=True)
 
         if hitl_mode and st.session_state.get("pending_state"):
-            if st.button("▶️ POST /v1/audits/synthesize", use_container_width=True):
+            if st.button(f"▶️ {api.url(VeritasAPI.AUDITS_SYNTHESIZE)}", use_container_width=True):
                 try:
                     result = api.synthesize(st.session_state["pending_state"], save=True)
                     st.session_state.audit_results = {
@@ -353,7 +354,7 @@ with tab_live:
         st.session_state.pending_state = None
 
     if audit_clicked:
-        status = st.status(f"POST /v1/audits/run → {base}", expanded=True)
+        status = st.status(f"Calling {api.url(VeritasAPI.AUDITS_RUN)} …", expanded=True)
         step = "agents_only" if hitl_mode else "full"
         try:
             result = api.run_audit(
@@ -397,7 +398,7 @@ with tab_live:
         render_audit_results(r["final_state"], r["supplier_key"], r["supplier"], r.get("audit_id"))
 
 with tab_history:
-    st.markdown("<h3>GET /v1/audits</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3>{api.url(VeritasAPI.AUDITS)}</h3>", unsafe_allow_html=True)
     filter_sup = st.selectbox("Filter by supplier", [None] + list(SUPPLIERS.keys()), format_func=lambda x: "All suppliers" if x is None else SUPPLIERS[x]["name"])
     try:
         rows = api.list_audits(limit=50, supplier_id=filter_sup)
@@ -406,7 +407,8 @@ with tab_history:
         else:
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
             audit_pick = st.selectbox("Load audit detail", rows, format_func=lambda r: f"#{r['id']} · {r['supplier_name']} · {r['truth_score']}/100 · {r['created_at'][:19]}")
-            if st.button("Load GET /v1/audits/{id}"):
+            detail_url = api.url(f"{VeritasAPI.AUDITS}/{audit_pick['id']}")
+            if st.button(f"Load {detail_url}"):
                 detail_row = api.get_audit(audit_pick["id"])
                 state = detail_row.get("final_state") or {}
                 render_audit_results(
